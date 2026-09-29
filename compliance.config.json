@@ -1,0 +1,7 @@
+{
+  "disallowedLicenses": [],
+  "disallowedRiskTiers": ["copyleft"],
+  "licenseRiskMap": {
+    "(MIT OR GPL-3.0-or-later)": "permissive"
+  }
+}

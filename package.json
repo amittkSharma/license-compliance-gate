@@ -1,0 +1,49 @@
+{
+  "name": "license-compliance-gate",
+  "version": "0.1.0",
+  "description": "SBOM/license compliance gate for Node projects — scans dependencies with license-checker, normalizes and diffs them with foss-notices-viewer, and enforces a configurable license policy in CI.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "compliance-gate": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "demo": "npm run build && node dist/cli.js scan . --out compliance-report.json --no-fail && cat compliance-report.json",
+    "release:dry": "npm run typecheck && npm test && npm run build && commit-and-tag-version --dry-run",
+    "release": "npm run typecheck && npm test && npm run build && commit-and-tag-version"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "exceljs": "^3.4.0",
+    "foss-notices-viewer": "^0.1.0",
+    "license-checker": "^25.0.1",
+    "read-installed": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/license-checker": "^25.0.6",
+    "@types/node": "^22.9.0",
+    "commit-and-tag-version": "^13.2.1",
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "license": "MIT"
+}

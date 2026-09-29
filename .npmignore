@@ -1,0 +1,11 @@
+src/
+test/
+docs/
+reports/
+.codesight/
+.compliance/
+tsconfig.json
+tsup.config.ts
+package-lock.json
+compliance.config.json
+*.log
