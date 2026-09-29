@@ -3,6 +3,16 @@
   "version": "0.1.0",
   "description": "SBOM/license compliance gate for Node projects — scans dependencies with license-checker, normalizes and diffs them with foss-notices-viewer, and enforces a configurable license policy in CI.",
   "type": "module",
+  "license": "MIT",
+  "author": "Amitt K Sharma",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amittkSharma/license-compliance-gate"
+  },
+  "homepage": "https://github.com/amittkSharma/license-compliance-gate",
+  "bugs": {
+    "url": "https://github.com/amittkSharma/license-compliance-gate/issues"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -44,6 +54,5 @@
     "tsup": "^8.3.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
-  },
-  "license": "MIT"
+  }
 }
