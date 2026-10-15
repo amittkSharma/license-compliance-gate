@@ -1,0 +1,47 @@
+# Publishes this package to npm with provenance.
+#
+# Trigger: publish a GitHub Release whose tag matches the version in package.json
+# (e.g. tag v1.0.0 for "version": "1.0.0"). Pushing a tag alone does NOT publish.
+# Manual runs: Actions tab -> "Publish" -> Run workflow (uses the selected ref).
+#
+# One-time setup: add an npm automation/granular token with publish rights for the
+# @amittksharma scope as the repo secret NPM_TOKEN (Settings -> Secrets -> Actions).
+# `id-token: write` lets npm attach the provenance attestation requested by .npmrc.
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Check the release tag matches package.json
+        if: github.event_name == 'release'
+        run: |
+          expected="v$(node -p "require('./package.json').version")"
+          if [ "$expected" != "${{ github.event.release.tag_name }}" ]; then
+            echo "Release tag ${{ github.event.release.tag_name }} does not match package.json ($expected)" >&2
+            exit 1
+          fi
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Publish to npm (runs prepublishOnly checks where the package defines them)
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
