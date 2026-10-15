@@ -1,6 +1,10 @@
 import { basename, resolve } from "node:path";
+import {
+  evaluatePolicy,
+  loadPolicyConfig,
+  resolvePolicyPath,
+} from "./policy.js";
 import { scanWithSource } from "./scan.js";
-import { evaluatePolicy, loadPolicyConfig, resolvePolicyPath } from "./policy.js";
 import type { RepoScanResult, ScanSource } from "./types.js";
 
 /**
@@ -17,10 +21,17 @@ export async function scanWorkspace(
 ): Promise<RepoScanResult[]> {
   const results: RepoScanResult[] = [];
   for (const dir of dirs) {
-    const policy = await loadPolicyConfig(resolvePolicyPath(dir, explicitPolicyPath));
+    const policy = await loadPolicyConfig(
+      resolvePolicyPath(dir, explicitPolicyPath),
+    );
     const { document, chains } = await scanWithSource(dir, source);
     const violations = evaluatePolicy(document, policy);
-    results.push({ repo: document.project?.name ?? basename(resolve(dir)), document, violations, chains });
+    results.push({
+      repo: document.project?.name ?? basename(resolve(dir)),
+      document,
+      violations,
+      chains,
+    });
   }
   return results;
 }

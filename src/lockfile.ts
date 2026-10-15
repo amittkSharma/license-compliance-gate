@@ -36,7 +36,9 @@ export async function readPackageLock(dir: string): Promise<PackageLockJson> {
   try {
     raw = await readFile(path, "utf8");
   } catch {
-    throw new Error(`No package-lock.json found at ${path} — lockfile-only scanning needs a committed npm lockfile.`);
+    throw new Error(
+      `No package-lock.json found at ${path} — lockfile-only scanning needs a committed npm lockfile.`,
+    );
   }
   const lock = JSON.parse(raw) as PackageLockJson;
   if (!lock.packages || (lock.lockfileVersion ?? 0) < 2) {
@@ -60,7 +62,10 @@ function normalizeLicenseId(license: string | undefined): string {
 function buildDocument(lock: PackageLockJson): NoticesDocument {
   const packages = lock.packages ?? {};
   const root = packages[""] ?? {};
-  const directNames = new Set([...Object.keys(root.dependencies ?? {}), ...Object.keys(root.devDependencies ?? {})]);
+  const directNames = new Set([
+    ...Object.keys(root.dependencies ?? {}),
+    ...Object.keys(root.devDependencies ?? {}),
+  ]);
 
   const components: Component[] = Object.entries(packages)
     .filter(([key]) => key !== "" && key.includes("node_modules/"))
@@ -79,7 +84,10 @@ function buildDocument(lock: PackageLockJson): NoticesDocument {
   return {
     source: "unknown",
     generatedAt: new Date().toISOString(),
-    project: { name: root.name ?? lock.name, version: root.version ?? lock.version },
+    project: {
+      name: root.name ?? lock.name,
+      version: root.version ?? lock.version,
+    },
     components,
   };
 }
@@ -94,7 +102,9 @@ function candidateKeysFor(key: string, name: string): string[] {
   const candidates: string[] = [];
   let prefix = key;
   for (;;) {
-    candidates.push(prefix ? `${prefix}/node_modules/${name}` : `node_modules/${name}`);
+    candidates.push(
+      prefix ? `${prefix}/node_modules/${name}` : `node_modules/${name}`,
+    );
     if (!prefix) break;
     const cut = prefix.lastIndexOf("/node_modules/");
     prefix = cut === -1 ? "" : prefix.slice(0, cut);
@@ -103,26 +113,40 @@ function candidateKeysFor(key: string, name: string): string[] {
 }
 
 /** Same shortest-chain BFS as `buildChainMap` in `scan.ts`, but walking the lockfile's own declared `dependencies` edges instead of an installed tree — see that function's doc comment for the general approach. */
-function buildChainMapFromLockfile(lock: PackageLockJson): Map<string, string[]> {
+function buildChainMapFromLockfile(
+  lock: PackageLockJson,
+): Map<string, string[]> {
   const packages = lock.packages ?? {};
   const root = packages[""] ?? {};
   const rootName = root.name ?? lock.name ?? "root";
   const chains = new Map<string, string[]>();
   const visited = new Set<string>([""]);
-  const rootEdges = new Set([...Object.keys(root.dependencies ?? {}), ...Object.keys(root.devDependencies ?? {})]);
-  let frontier: { key: string; chain: string[]; edges: Set<string> }[] = [{ key: "", chain: [rootName], edges: rootEdges }];
+  const rootEdges = new Set([
+    ...Object.keys(root.dependencies ?? {}),
+    ...Object.keys(root.devDependencies ?? {}),
+  ]);
+  let frontier: { key: string; chain: string[]; edges: Set<string> }[] = [
+    { key: "", chain: [rootName], edges: rootEdges },
+  ];
 
   while (frontier.length > 0) {
     const next: typeof frontier = [];
     for (const { key, chain, edges } of frontier) {
       for (const name of edges) {
-        const childKey = candidateKeysFor(key, name).find((candidate) => candidate in packages);
+        const childKey = candidateKeysFor(key, name).find(
+          (candidate) => candidate in packages,
+        );
         if (!childKey || visited.has(childKey)) continue;
         visited.add(childKey);
-        const child = packages[childKey]!;
+        const child = packages[childKey];
+        if (!child) continue;
         const childChain = [...chain, name];
         chains.set(`${name}@${child.version ?? ""}`, childChain);
-        next.push({ key: childKey, chain: childChain, edges: new Set(Object.keys(child.dependencies ?? {})) });
+        next.push({
+          key: childKey,
+          chain: childChain,
+          edges: new Set(Object.keys(child.dependencies ?? {})),
+        });
       }
     }
     frontier = next;
@@ -132,7 +156,12 @@ function buildChainMapFromLockfile(lock: PackageLockJson): Map<string, string[]>
 }
 
 /** Scans `dir` using only its committed `package-lock.json` — no `node_modules` install required. See `readPackageLock`'s doc comment for the lockfile format this needs. */
-export async function scanLockfile(dir: string): Promise<{ document: NoticesDocument; chains: Map<string, string[]> }> {
+export async function scanLockfile(
+  dir: string,
+): Promise<{ document: NoticesDocument; chains: Map<string, string[]> }> {
   const lock = await readPackageLock(dir);
-  return { document: buildDocument(lock), chains: buildChainMapFromLockfile(lock) };
+  return {
+    document: buildDocument(lock),
+    chains: buildChainMapFromLockfile(lock),
+  };
 }

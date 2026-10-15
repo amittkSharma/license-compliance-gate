@@ -1,4 +1,9 @@
-# license-compliance-gate
+# @amittksharma/license-compliance-gate
+
+[![npm version](https://img.shields.io/npm/v/@amittksharma/license-compliance-gate)](https://www.npmjs.com/package/@amittksharma/license-compliance-gate)
+[![npm downloads](https://img.shields.io/npm/dm/@amittksharma/license-compliance-gate)](https://www.npmjs.com/package/@amittksharma/license-compliance-gate)
+[![license](https://img.shields.io/npm/l/@amittksharma/license-compliance-gate)](./LICENSE)
+[![node](https://img.shields.io/node/v/@amittksharma/license-compliance-gate)](https://www.npmjs.com/package/@amittksharma/license-compliance-gate)
 
 Ever shipped a release only to have legal ask "wait, is this dependency
 allowed?" This tool answers that question automatically, before you ship.
@@ -13,12 +18,18 @@ chain that pulled it in.
 **60-second version:**
 
 ```bash
-npm install -g license-compliance-gate
+npm install -g @amittksharma/license-compliance-gate
 compliance-gate scan . --out report.html && open report.html
 ```
 
 That's it. No config required — it ships with a sane default policy (block
 copyleft licenses like GPL/AGPL) and reports on everything else.
+
+The package is scoped, but the command it installs is still the short `compliance-gate`. Only `npx` needs the full scoped name, e.g. `npx @amittksharma/license-compliance-gate scan .`.
+
+### Migrating from `license-compliance-gate`
+
+The unscoped `license-compliance-gate` package has moved here. Only the package name changed: replace `license-compliance-gate` with `@amittksharma/license-compliance-gate` in your install commands, `npx` calls, CI snippets and `import`/`require` statements. The `compliance-gate` command, its flags and your `compliance.config.json` are unchanged.
 
 ## Table of contents
 
@@ -47,7 +58,7 @@ adds the one piece they were missing:
   in an update, dependency-chain tracing so a violation isn't just a name on
   a list, and support for scanning many repos (or a whole monorepo) at once.
 
-Ships as both ESM and CommonJS — `import` or `require("license-compliance-gate")`
+Ships as both ESM and CommonJS — `import` or `require("@amittksharma/license-compliance-gate")`
 both work, no extra config either way.
 
 ## What you can do with it
@@ -268,7 +279,7 @@ Any CI system that fails a job on a non-zero exit code works — `scan` exits
 ```yaml
 # GitHub Actions
 - name: License compliance gate
-  run: npx license-compliance-gate scan . --out compliance-report.html
+  run: npx @amittksharma/license-compliance-gate scan . --out compliance-report.html
 - name: Upload report
   if: always()
   uses: actions/upload-artifact@v4
@@ -285,7 +296,7 @@ fail" three weeks later.
 
 ```yaml
 - name: License compliance gate
-  run: npx license-compliance-gate scan . --out compliance-report.sarif --no-fail
+  run: npx @amittksharma/license-compliance-gate scan . --out compliance-report.sarif --no-fail
 - uses: github/codeql-action/upload-sarif@v3
   with:
     sarif_file: compliance-report.sarif
@@ -298,7 +309,7 @@ without `--no-fail`) still fail the job if you also want a hard gate.
 **Azure DevOps (JUnit):**
 
 ```yaml
-- script: npx license-compliance-gate scan . --out compliance-report.xml --no-fail
+- script: npx @amittksharma/license-compliance-gate scan . --out compliance-report.xml --no-fail
   displayName: License compliance gate
 - task: PublishTestResults@2
   condition: always()
@@ -354,7 +365,7 @@ Everything the CLI does is also exported for use directly in your own script
 cover):
 
 ```ts
-import { scanWithSource, evaluatePolicy, loadPolicyConfig, writeReport } from "license-compliance-gate";
+import { scanWithSource, evaluatePolicy, loadPolicyConfig, writeReport } from "@amittksharma/license-compliance-gate";
 
 const { document, chains } = await scanWithSource(".", "node_modules");
 const policy = await loadPolicyConfig(); // DEFAULT_POLICY — pass resolvePolicyPath(dir, explicitPath) to auto-discover compliance.config.json like the CLI does

@@ -1,18 +1,29 @@
-export { scanDirectory, computeDependencyChains, scanWithSource } from "./scan.js";
-export { scanLockfile } from "./lockfile.js";
-export { scanWorkspace } from "./workspace.js";
-export { evaluatePolicy, loadPolicyConfig, resolvePolicyPath } from "./policy.js";
-export { loadBaseline, saveBaseline, DEFAULT_BASELINE_PATH } from "./baseline.js";
+export { parseLicenseCheckerOutput } from "./adapters/licenseChecker.js";
 export {
-  writeReport,
-  writeWorkspaceReport,
+  DEFAULT_BASELINE_PATH,
+  loadBaseline,
+  saveBaseline,
+} from "./baseline.js";
+export { scanLockfile } from "./lockfile.js";
+export {
+  evaluatePolicy,
+  loadPolicyConfig,
+  resolvePolicyPath,
+} from "./policy.js";
+export {
   printConsoleSummary,
   toJunitReport,
   toJunitWorkspaceReport,
   toSarifReport,
   toSarifWorkspaceReport,
+  writeReport,
+  writeWorkspaceReport,
 } from "./report.js";
-export { parseLicenseCheckerOutput } from "./adapters/licenseChecker.js";
+export {
+  computeDependencyChains,
+  scanDirectory,
+  scanWithSource,
+} from "./scan.js";
 export {
   DEFAULT_POLICY,
   type PolicyConfig,
@@ -20,3 +31,4 @@ export {
   type RepoScanResult,
   type ScanSource,
 } from "./types.js";
+export { scanWorkspace } from "./workspace.js";

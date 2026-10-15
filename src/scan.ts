@@ -1,10 +1,10 @@
-import { readFile, readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import licenseChecker from "license-checker";
-import type { ModuleInfos } from "license-checker";
-import readInstalled from "read-installed";
-import type { InstalledPackageNode } from "read-installed";
 import type { NoticesDocument } from "foss-notices-viewer";
+import type { ModuleInfos } from "license-checker";
+import licenseChecker from "license-checker";
+import type { InstalledPackageNode } from "read-installed";
+import readInstalled from "read-installed";
 import { parseLicenseCheckerOutput } from "./adapters/licenseChecker.js";
 import { scanLockfile } from "./lockfile.js";
 import type { ScanSource } from "./types.js";
@@ -35,7 +35,9 @@ interface ProjectPackageJson {
   workspaces?: string[] | { packages?: string[] };
 }
 
-async function readProjectPackageJson(dir: string): Promise<ProjectPackageJson | undefined> {
+async function readProjectPackageJson(
+  dir: string,
+): Promise<ProjectPackageJson | undefined> {
   try {
     return JSON.parse(await readFile(join(dir, "package.json"), "utf8"));
   } catch {
@@ -43,9 +45,13 @@ async function readProjectPackageJson(dir: string): Promise<ProjectPackageJson |
   }
 }
 
-function getPackageJsonWorkspacePatterns(pkg: ProjectPackageJson | undefined): string[] {
+function getPackageJsonWorkspacePatterns(
+  pkg: ProjectPackageJson | undefined,
+): string[] {
   if (!pkg?.workspaces) return [];
-  return Array.isArray(pkg.workspaces) ? pkg.workspaces : (pkg.workspaces.packages ?? []);
+  return Array.isArray(pkg.workspaces)
+    ? pkg.workspaces
+    : (pkg.workspaces.packages ?? []);
 }
 
 /**
@@ -76,12 +82,20 @@ export function parsePnpmWorkspaceYaml(content: string): string[] {
   return patterns;
 }
 
-async function readPnpmWorkspaceYaml(rootDir: string): Promise<string | undefined> {
-  return readFile(join(rootDir, "pnpm-workspace.yaml"), "utf8").catch(() => undefined);
+async function readPnpmWorkspaceYaml(
+  rootDir: string,
+): Promise<string | undefined> {
+  return readFile(join(rootDir, "pnpm-workspace.yaml"), "utf8").catch(
+    () => undefined,
+  );
 }
 
-function getWorkspacePatterns(pnpmWorkspaceYaml: string | undefined, pkg: ProjectPackageJson | undefined): string[] {
-  if (pnpmWorkspaceYaml !== undefined) return parsePnpmWorkspaceYaml(pnpmWorkspaceYaml);
+function getWorkspacePatterns(
+  pnpmWorkspaceYaml: string | undefined,
+  pkg: ProjectPackageJson | undefined,
+): string[] {
+  if (pnpmWorkspaceYaml !== undefined)
+    return parsePnpmWorkspaceYaml(pnpmWorkspaceYaml);
   return getPackageJsonWorkspacePatterns(pkg);
 }
 
@@ -95,16 +109,23 @@ function getWorkspacePatterns(pnpmWorkspaceYaml: string | undefined, pkg: Projec
  * ponytail: no real glob engine, single-level `/*` only — add `fast-glob` if
  * a project actually uses nested or negated workspace patterns.
  */
-export async function resolveWorkspaceDirs(rootDir: string, patterns: string[]): Promise<string[]> {
+export async function resolveWorkspaceDirs(
+  rootDir: string,
+  patterns: string[],
+): Promise<string[]> {
   const dirs: string[] = [];
   for (const pattern of patterns) {
     if (pattern.includes("*") && !pattern.endsWith("/*")) {
-      console.warn(`Unsupported workspaces pattern "${pattern}" — only an exact path or a trailing "/*" is supported, skipping.`);
+      console.warn(
+        `Unsupported workspaces pattern "${pattern}" — only an exact path or a trailing "/*" is supported, skipping.`,
+      );
       continue;
     }
     if (pattern.endsWith("/*")) {
       const parent = join(rootDir, pattern.slice(0, -2));
-      const entries = await readdir(parent, { withFileTypes: true }).catch(() => []);
+      const entries = await readdir(parent, { withFileTypes: true }).catch(
+        () => [],
+      );
       for (const entry of entries) {
         if (entry.isDirectory()) dirs.push(join(parent, entry.name));
       }
@@ -153,15 +174,36 @@ async function resolveScanTargets(absoluteDir: string): Promise<ScanTargets> {
     readPnpmWorkspaceYaml(absoluteDir),
   ]);
 
-  const workspacePatterns = getWorkspacePatterns(pnpmWorkspaceYaml, projectPackageJson);
-  const workspaceDirs = await resolveWorkspaceDirs(absoluteDir, workspacePatterns);
-  const workspacePackageJsons = await Promise.all(workspaceDirs.map(readProjectPackageJson));
-  const directDependencyNames = collectDirectDependencyNames(projectPackageJson, workspacePackageJsons);
+  const workspacePatterns = getWorkspacePatterns(
+    pnpmWorkspaceYaml,
+    projectPackageJson,
+  );
+  const workspaceDirs = await resolveWorkspaceDirs(
+    absoluteDir,
+    workspacePatterns,
+  );
+  const workspacePackageJsons = await Promise.all(
+    workspaceDirs.map(readProjectPackageJson),
+  );
+  const directDependencyNames = collectDirectDependencyNames(
+    projectPackageJson,
+    workspacePackageJsons,
+  );
 
-  const isPnpmWorkspace = pnpmWorkspaceYaml !== undefined && workspaceDirs.length > 0;
-  const scanTargets = isPnpmWorkspace ? [absoluteDir, ...workspaceDirs] : [absoluteDir];
+  const isPnpmWorkspace =
+    pnpmWorkspaceYaml !== undefined && workspaceDirs.length > 0;
+  const scanTargets = isPnpmWorkspace
+    ? [absoluteDir, ...workspaceDirs]
+    : [absoluteDir];
 
-  return { projectPackageJson, workspaceDirs, workspacePackageJsons, directDependencyNames, scanTargets, isPnpmWorkspace };
+  return {
+    projectPackageJson,
+    workspaceDirs,
+    workspacePackageJsons,
+    directDependencyNames,
+    scanTargets,
+    isPnpmWorkspace,
+  };
 }
 
 /**
@@ -171,7 +213,10 @@ async function resolveScanTargets(absoluteDir: string): Promise<ScanTargets> {
  * noise specific to per-package scanning, so it's stripped back out here —
  * the root's own self-entry is left alone, matching every other scan.
  */
-function omitSelfEntry(pkgs: ModuleInfos, selfPkg: ProjectPackageJson | undefined): ModuleInfos {
+function omitSelfEntry(
+  pkgs: ModuleInfos,
+  selfPkg: ProjectPackageJson | undefined,
+): ModuleInfos {
   if (!selfPkg?.name || !selfPkg.version) return pkgs;
   const key = `${selfPkg.name}@${selfPkg.version}`;
   if (!(key in pkgs)) return pkgs;
@@ -200,19 +245,30 @@ function omitSelfEntry(pkgs: ModuleInfos, selfPkg: ProjectPackageJson | undefine
  */
 export async function scanDirectory(dir: string): Promise<NoticesDocument> {
   const absoluteDir = resolve(dir);
-  const { projectPackageJson, workspaceDirs, workspacePackageJsons, directDependencyNames, isPnpmWorkspace } =
-    await resolveScanTargets(absoluteDir);
+  const {
+    projectPackageJson,
+    workspaceDirs,
+    workspacePackageJsons,
+    directDependencyNames,
+    isPnpmWorkspace,
+  } = await resolveScanTargets(absoluteDir);
 
   const rootPackages = await runLicenseChecker(absoluteDir);
   const workspacePackagesLists = isPnpmWorkspace
     ? await Promise.all(
         workspaceDirs.map(async (target, i) => {
-          const pkgs = await runLicenseChecker(target).catch(() => ({}) as ModuleInfos);
+          const pkgs = await runLicenseChecker(target).catch(
+            () => ({}) as ModuleInfos,
+          );
           return omitSelfEntry(pkgs, workspacePackageJsons[i]);
         }),
       )
     : [];
-  const packages: ModuleInfos = Object.assign({}, rootPackages, ...workspacePackagesLists);
+  const packages: ModuleInfos = Object.assign(
+    {},
+    rootPackages,
+    ...workspacePackagesLists,
+  );
 
   const document = parseLicenseCheckerOutput(packages, directDependencyNames);
   document.project = {
@@ -260,13 +316,21 @@ export async function scanDirectory(dir: string): Promise<NoticesDocument> {
  * ponytail: falls back to the tree root only, not the full ancestor chain —
  * add real per-node ancestor walking if a repo needs nested-hoist resolution.
  */
-function buildChainMap(tree: InstalledPackageNode, workspacePackageNames: string[] = []): Map<string, string[]> {
+function buildChainMap(
+  tree: InstalledPackageNode,
+  workspacePackageNames: string[] = [],
+): Map<string, string[]> {
   const chains = new Map<string, string[]>();
   const visited = new Set<InstalledPackageNode>([tree]);
-  const rootEdges = new Set([...Object.keys(tree._dependencies ?? {}), ...Object.keys(tree.devDependencies ?? {})]);
-  let frontier: { node: InstalledPackageNode; chain: string[]; edges: Set<string> }[] = [
-    { node: tree, chain: [tree.name], edges: rootEdges },
-  ];
+  const rootEdges = new Set([
+    ...Object.keys(tree._dependencies ?? {}),
+    ...Object.keys(tree.devDependencies ?? {}),
+  ]);
+  let frontier: {
+    node: InstalledPackageNode;
+    chain: string[];
+    edges: Set<string>;
+  }[] = [{ node: tree, chain: [tree.name], edges: rootEdges }];
 
   for (const name of workspacePackageNames) {
     const node = tree.dependencies?.[name];
@@ -276,7 +340,10 @@ function buildChainMap(tree: InstalledPackageNode, workspacePackageNames: string
     chains.set(`${node.name}@${node.version ?? ""}`, chain);
     // A workspace package is itself a project, same as the tree root — its own
     // devDependencies are genuinely direct too, not just its "dependencies".
-    const edges = new Set([...Object.keys(node._dependencies ?? {}), ...Object.keys(node.devDependencies ?? {})]);
+    const edges = new Set([
+      ...Object.keys(node._dependencies ?? {}),
+      ...Object.keys(node.devDependencies ?? {}),
+    ]);
     frontier.push({ node, chain, edges });
   }
 
@@ -289,7 +356,11 @@ function buildChainMap(tree: InstalledPackageNode, workspacePackageNames: string
         visited.add(child);
         const childChain = [...chain, child.name];
         chains.set(`${child.name}@${child.version ?? ""}`, childChain);
-        next.push({ node: child, chain: childChain, edges: new Set(Object.keys(child._dependencies ?? {})) });
+        next.push({
+          node: child,
+          chain: childChain,
+          edges: new Set(Object.keys(child._dependencies ?? {})),
+        });
       }
     }
     frontier = next;
@@ -307,8 +378,12 @@ function buildChainMap(tree: InstalledPackageNode, workspacePackageNames: string
  * an npm/yarn workspaces root (the first scan target), also seeds each
  * workspace package by name — see `buildChainMap`'s doc comment for why.
  */
-export async function computeDependencyChains(dir: string): Promise<Map<string, string[]>> {
-  const { scanTargets, workspacePackageJsons } = await resolveScanTargets(resolve(dir));
+export async function computeDependencyChains(
+  dir: string,
+): Promise<Map<string, string[]>> {
+  const { scanTargets, workspacePackageJsons } = await resolveScanTargets(
+    resolve(dir),
+  );
   const workspacePackageNames = workspacePackageJsons
     .map((pkg) => pkg?.name)
     .filter((name): name is string => name !== undefined);
@@ -341,6 +416,9 @@ export async function scanWithSource(
   source: ScanSource = "node_modules",
 ): Promise<{ document: NoticesDocument; chains: Map<string, string[]> }> {
   if (source === "lockfile") return scanLockfile(dir);
-  const [document, chains] = await Promise.all([scanDirectory(dir), computeDependencyChains(dir)]);
+  const [document, chains] = await Promise.all([
+    scanDirectory(dir),
+    computeDependencyChains(dir),
+  ]);
   return { document, chains };
 }

@@ -1,7 +1,11 @@
 import { writeFile } from "node:fs/promises";
 import { extname } from "node:path";
 import ExcelJS from "exceljs";
-import { queryNotices, toExportRows, type NoticesDocument } from "foss-notices-viewer";
+import {
+  type NoticesDocument,
+  queryNotices,
+  toExportRows,
+} from "foss-notices-viewer";
 import type { PolicyViolation, RepoScanResult } from "./types.js";
 
 /** One row of a report's component table. */
@@ -50,7 +54,14 @@ export interface WorkspaceReport {
   repos: RepoReportSection[];
 }
 
-const COLUMNS = ["name", "version", "license", "risk", "author", "purl"] as const;
+const COLUMNS = [
+  "name",
+  "version",
+  "license",
+  "risk",
+  "author",
+  "purl",
+] as const;
 const HEADERS: Record<(typeof COLUMNS)[number], string> = {
   name: "Package Name",
   version: "Version",
@@ -74,10 +85,13 @@ export function toReportRows(
   chains?: ReadonlyMap<string, string[]>,
   violations?: PolicyViolation[],
 ): ReportRow[] {
-  const violationKeys = new Set(violations?.map((v) => `${v.component}@${v.version ?? ""}`));
+  const violationKeys = new Set(
+    violations?.map((v) => `${v.component}@${v.version ?? ""}`),
+  );
   return toExportRows(document).map((row) => {
     const tagged: ReportRow = { ...row };
-    if (violationKeys.has(`${row.name}@${row.version}`)) tagged.violation = true;
+    if (violationKeys.has(`${row.name}@${row.version}`))
+      tagged.violation = true;
     // toExportRows's `risk` is the display label ("Permissive"), not the raw RiskTier ("permissive").
     if (chains && row.risk.toLowerCase() !== "permissive") {
       const chain = chains.get(`${row.name}@${row.version}`);
@@ -94,7 +108,11 @@ export function filterViolationRows(rows: ReportRow[]): ReportRow[] {
 }
 
 /** Total components, distinct license count, and gate pass/fail — computed once and rendered identically in every format. */
-export function buildSummary(rows: ReportRow[], repos: string[], violations: PolicyViolation[]): ReportSummary {
+export function buildSummary(
+  rows: ReportRow[],
+  repos: string[],
+  violations: PolicyViolation[],
+): ReportSummary {
   return {
     repos,
     scannedAt: new Date().toISOString(),
@@ -117,7 +135,11 @@ export function buildWorkspaceReport(
   { violationsOnly = false }: { violationsOnly?: boolean } = {},
 ): WorkspaceReport {
   const sections = results.map((result) => {
-    const rows = toReportRows(result.document, result.chains, result.violations);
+    const rows = toReportRows(
+      result.document,
+      result.chains,
+      result.violations,
+    );
     const summary = buildSummary(rows, [result.repo], result.violations);
     return { repo: result.repo, summary, rows };
   });
@@ -127,7 +149,10 @@ export function buildWorkspaceReport(
     results.flatMap((result) => result.violations),
   );
   const repos = violationsOnly
-    ? sections.map((section) => ({ ...section, rows: filterViolationRows(section.rows) }))
+    ? sections.map((section) => ({
+        ...section,
+        rows: filterViolationRows(section.rows),
+      }))
     : sections;
   return { overall, repos };
 }
@@ -136,7 +161,8 @@ type Column = (typeof COLUMNS)[number] | "violation" | "chain";
 
 function columnsFor(rows: ReportRow[]): Column[] {
   const columns: Column[] = [...COLUMNS];
-  if (rows.some((row) => row.violation !== undefined)) columns.splice(4, 0, "violation");
+  if (rows.some((row) => row.violation !== undefined))
+    columns.splice(4, 0, "violation");
   if (rows.some((row) => row.chain !== undefined)) columns.push("chain");
   return columns;
 }
@@ -154,7 +180,10 @@ function cellValue(row: ReportRow, column: Column): string {
 
 /** `includeRepos: false` drops the "Repositories" line — used for a single
  * repo's own section, where the heading above it already names the repo. */
-function summaryLines(summary: ReportSummary, { includeRepos = true }: { includeRepos?: boolean } = {}): string[] {
+function summaryLines(
+  summary: ReportSummary,
+  { includeRepos = true }: { includeRepos?: boolean } = {},
+): string[] {
   const lines: string[] = [];
   if (includeRepos) lines.push(`Repositories: ${summary.repos.join(", ")}`);
   lines.push(
@@ -173,13 +202,19 @@ function markdownTable(rows: ReportRow[]): string[] {
   return [
     `| ${columns.map(headerFor).join(" | ")} |`,
     `| ${columns.map(() => "---").join(" | ")} |`,
-    ...rows.map((row) => `| ${columns.map((c) => escapeMarkdown(cellValue(row, c))).join(" | ")} |`),
+    ...rows.map(
+      (row) =>
+        `| ${columns.map((c) => escapeMarkdown(cellValue(row, c))).join(" | ")} |`,
+    ),
   ];
 }
 
 /** Renders rows as GitHub-flavored Markdown — pipes in cell values are escaped since they'd otherwise break the table grid. */
-export function toMarkdownReport(rows: ReportRow[], summary: ReportSummary): string {
-  return [
+export function toMarkdownReport(
+  rows: ReportRow[],
+  summary: ReportSummary,
+): string {
+  return `${[
     "## Summary",
     "",
     ...summaryLines(summary).map((line) => `- ${line}`),
@@ -187,27 +222,37 @@ export function toMarkdownReport(rows: ReportRow[], summary: ReportSummary): str
     "## Components",
     "",
     ...markdownTable(rows),
-  ].join("\n") + "\n";
+  ].join("\n")}\n`;
 }
 
 /** Renders a `scan-workspace` report as Markdown — one `##` section per repo, each with its own summary and table, so a failing repo is easy to find without scanning one huge merged table. */
 export function toMarkdownWorkspaceReport(report: WorkspaceReport): string {
-  const lines = ["## Summary", "", ...summaryLines(report.overall).map((line) => `- ${line}`)];
+  const lines = [
+    "## Summary",
+    "",
+    ...summaryLines(report.overall).map((line) => `- ${line}`),
+  ];
   for (const section of report.repos) {
     lines.push(
       "",
       `## ${section.repo}`,
       "",
-      ...summaryLines(section.summary, { includeRepos: false }).map((line) => `- ${line}`),
+      ...summaryLines(section.summary, { includeRepos: false }).map(
+        (line) => `- ${line}`,
+      ),
       "",
       ...markdownTable(section.rows),
     );
   }
-  return lines.join("\n") + "\n";
+  return `${lines.join("\n")}\n`;
 }
 
 const escapeHtml = (value: string) =>
-  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 
 const HTML_STYLE = `
   body { font-family: system-ui, sans-serif; margin: 2rem; }
@@ -263,7 +308,10 @@ ${body}
 `;
 }
 
-function summaryBox(summary: ReportSummary, { includeRepos = true }: { includeRepos?: boolean } = {}): string {
+function summaryBox(
+  summary: ReportSummary,
+  { includeRepos = true }: { includeRepos?: boolean } = {},
+): string {
   const gateClass = summary.gatePassed ? "pass" : "fail";
   const gateLabel = summary.gatePassed ? "PASSED" : "FAILED";
   const reposLine = includeRepos
@@ -281,7 +329,10 @@ function filterDropdowns(rows: ReportRow[]): string {
   const optionsFor = (values: Iterable<string>) =>
     [...new Set(values)]
       .sort()
-      .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`)
+      .map(
+        (value) =>
+          `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`,
+      )
       .join("");
   const violationFilter = rows.some((row) => row.violation !== undefined)
     ? `\n  <label>Violations:
@@ -300,11 +351,18 @@ function filterDropdowns(rows: ReportRow[]): string {
 
 function htmlTable(rows: ReportRow[]): string {
   const columns = columnsFor(rows);
-  const headerCells = columns.map((c) => `<th>${escapeHtml(headerFor(c))}</th>`).join("");
+  const headerCells = columns
+    .map((c) => `<th>${escapeHtml(headerFor(c))}</th>`)
+    .join("");
   const bodyRows = rows
     .map((row) => {
-      const cells = columns.map((c) => `<td>${escapeHtml(cellValue(row, c))}</td>`).join("");
-      const violationAttr = row.violation !== undefined ? ` data-violation="${row.violation ? "Yes" : "No"}"` : "";
+      const cells = columns
+        .map((c) => `<td>${escapeHtml(cellValue(row, c))}</td>`)
+        .join("");
+      const violationAttr =
+        row.violation !== undefined
+          ? ` data-violation="${row.violation ? "Yes" : "No"}"`
+          : "";
       return `<tr data-risk="${escapeHtml(row.risk)}" data-license="${escapeHtml(row.license)}"${violationAttr}>${cells}</tr>`;
     })
     .join("\n");
@@ -317,7 +375,10 @@ ${bodyRows}
 }
 
 /** Renders rows as a standalone HTML page, with risk/license filter dropdowns and no other dependencies. */
-export function toHtmlReport(rows: ReportRow[], summary: ReportSummary): string {
+export function toHtmlReport(
+  rows: ReportRow[],
+  summary: ReportSummary,
+): string {
   const body = `${summaryBox(summary)}
 ${filterDropdowns(rows)}
 ${htmlTable(rows)}
@@ -352,7 +413,10 @@ ${sections}
 }
 
 /** Serializes `{ summary, components }` as JSON — `chain` is present per-row only when set. */
-export function toJsonReport(rows: ReportRow[], summary: ReportSummary): string {
+export function toJsonReport(
+  rows: ReportRow[],
+  summary: ReportSummary,
+): string {
   return JSON.stringify({ summary, components: rows }, null, 2);
 }
 
@@ -390,7 +454,10 @@ function addComponentRows(sheet: ExcelJS.Worksheet, rows: ReportRow[]): void {
   for (const row of rows) sheet.addRow(columns.map((c) => cellValue(row, c)));
 }
 
-function addSummaryRows(sheet: ExcelJS.Worksheet, summary: ReportSummary): void {
+function addSummaryRows(
+  sheet: ExcelJS.Worksheet,
+  summary: ReportSummary,
+): void {
   sheet.addRow(["Repositories", summary.repos.join(", ")]);
   sheet.addRow(["Scanned at", summary.scannedAt]);
   sheet.addRow(["Total components", summary.totalComponents]);
@@ -400,7 +467,10 @@ function addSummaryRows(sheet: ExcelJS.Worksheet, summary: ReportSummary): void 
 }
 
 /** Renders rows as an `.xlsx` workbook — a "Summary" sheet, then a "Notices" sheet with one row per component. */
-export async function toXlsxReport(rows: ReportRow[], summary: ReportSummary): Promise<Buffer> {
+export async function toXlsxReport(
+  rows: ReportRow[],
+  summary: ReportSummary,
+): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   addSummaryRows(workbook.addWorksheet("Summary"), summary);
   addComponentRows(workbook.addWorksheet("Notices"), rows);
@@ -411,13 +481,21 @@ export async function toXlsxReport(rows: ReportRow[], summary: ReportSummary): P
  * sheet with the overall gate result plus a one-row-per-repo rollup table
  * (so you can see which repo failed without opening every sheet), then one
  * sheet per repo with that repo's own components. */
-export async function toXlsxWorkspaceReport(report: WorkspaceReport): Promise<Buffer> {
+export async function toXlsxWorkspaceReport(
+  report: WorkspaceReport,
+): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
 
   const summarySheet = workbook.addWorksheet("Summary");
   addSummaryRows(summarySheet, report.overall);
   summarySheet.addRow([]);
-  summarySheet.addRow(["Repo", "Components", "Distinct Licenses", "Gate", "Violations"]);
+  summarySheet.addRow([
+    "Repo",
+    "Components",
+    "Distinct Licenses",
+    "Gate",
+    "Violations",
+  ]);
   for (const section of report.repos) {
     summarySheet.addRow([
       section.repo,
@@ -432,7 +510,10 @@ export async function toXlsxWorkspaceReport(report: WorkspaceReport): Promise<Bu
   for (const section of report.repos) {
     const sheet = workbook.addWorksheet(sheetNameFor(section.repo, usedNames));
     sheet.addRow(["Repo", section.repo]);
-    sheet.addRow(["Compliance gate", section.summary.gatePassed ? "PASSED" : "FAILED"]);
+    sheet.addRow([
+      "Compliance gate",
+      section.summary.gatePassed ? "PASSED" : "FAILED",
+    ]);
     sheet.addRow(["Violations", section.summary.violationCount]);
     sheet.addRow([]);
     addComponentRows(sheet, section.rows);
@@ -443,7 +524,8 @@ export async function toXlsxWorkspaceReport(report: WorkspaceReport): Promise<Bu
 
 function junitTestcase(row: ReportRow): string {
   const name = `${row.name}@${row.version}`;
-  if (!row.violation) return `  <testcase classname="license-compliance-gate" name="${escapeHtml(name)}" />`;
+  if (!row.violation)
+    return `  <testcase classname="license-compliance-gate" name="${escapeHtml(name)}" />`;
   const message = `${row.license} is ${row.risk} and violates the license policy`;
   return `  <testcase classname="license-compliance-gate" name="${escapeHtml(name)}">
     <failure message="${escapeHtml(message)}">${escapeHtml(message)}</failure>
@@ -458,13 +540,18 @@ ${rows.map(junitTestcase).join("\n")}
 }
 
 /** Renders rows as JUnit XML — one `<testcase>` per component, with a `<failure>` for any that violate the policy. Native in Azure DevOps (`PublishTestResults@2`); on GitHub Actions needs a marketplace action (e.g. `dorny/test-reporter`). */
-export function toJunitReport(rows: ReportRow[], suiteName = "license-compliance-gate"): string {
+export function toJunitReport(
+  rows: ReportRow[],
+  suiteName = "license-compliance-gate",
+): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n${junitTestsuite(rows, suiteName)}\n`;
 }
 
 /** Renders a `scan-workspace` report as JUnit XML — one `<testsuite>` per repo inside a `<testsuites>` wrapper. */
 export function toJunitWorkspaceReport(report: WorkspaceReport): string {
-  const suites = report.repos.map((section) => junitTestsuite(section.rows, section.repo)).join("\n");
+  const suites = report.repos
+    .map((section) => junitTestsuite(section.rows, section.repo))
+    .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites>\n${suites}\n</testsuites>\n`;
 }
 
@@ -477,10 +564,18 @@ interface SarifResult {
   ruleId: string;
   level: "error";
   message: { text: string };
-  locations: [{ physicalLocation: { artifactLocation: { uri: string }; region: { startLine: number } } }];
+  locations: [
+    {
+      physicalLocation: {
+        artifactLocation: { uri: string };
+        region: { startLine: number };
+      };
+    },
+  ];
 }
 
-const sarifRuleId = (violation: PolicyViolation) => `${violation.reason}/${violation.license}`;
+const sarifRuleId = (violation: PolicyViolation) =>
+  `${violation.reason}/${violation.license}`;
 
 /**
  * A dependency's disallowed license has no natural source line, so every
@@ -496,7 +591,14 @@ function sarifResult(violation: PolicyViolation, uri: string): SarifResult {
     message: {
       text: `${violation.component}@${violation.version ?? "?"} uses ${violation.license} (${violation.riskTier}), disallowed by policy (${violation.reason}).`,
     },
-    locations: [{ physicalLocation: { artifactLocation: { uri }, region: { startLine: 1 } } }],
+    locations: [
+      {
+        physicalLocation: {
+          artifactLocation: { uri },
+          region: { startLine: 1 },
+        },
+      },
+    ],
   };
 }
 
@@ -504,17 +606,37 @@ function sarifRules(violations: PolicyViolation[]): SarifRule[] {
   const rules = new Map<string, SarifRule>();
   for (const violation of violations) {
     const id = sarifRuleId(violation);
-    if (!rules.has(id)) rules.set(id, { id, shortDescription: { text: `${violation.license} is disallowed (${violation.reason})` } });
+    if (!rules.has(id))
+      rules.set(id, {
+        id,
+        shortDescription: {
+          text: `${violation.license} is disallowed (${violation.reason})`,
+        },
+      });
   }
   return [...rules.values()];
 }
 
-function sarifLog(results: SarifResult[], violations: PolicyViolation[]): string {
+function sarifLog(
+  results: SarifResult[],
+  violations: PolicyViolation[],
+): string {
   return JSON.stringify(
     {
-      $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+      $schema:
+        "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
       version: "2.1.0",
-      runs: [{ tool: { driver: { name: "license-compliance-gate", rules: sarifRules(violations) } }, results }],
+      runs: [
+        {
+          tool: {
+            driver: {
+              name: "license-compliance-gate",
+              rules: sarifRules(violations),
+            },
+          },
+          results,
+        },
+      ],
     },
     null,
     2,
@@ -548,13 +670,17 @@ interface FormatRenderers {
 }
 
 /** Writes whichever renderer matches `outPath`'s file extension (`.xlsx`, `.md`, `.html`, `.xml` for JUnit, `.sarif`, or default `.json`) — shared by `writeReport` and `writeWorkspaceReport` so the two never pick a different format for the same extension. */
-async function writeByExtension(outPath: string, renderers: FormatRenderers): Promise<void> {
+async function writeByExtension(
+  outPath: string,
+  renderers: FormatRenderers,
+): Promise<void> {
   const ext = extname(outPath);
   if (ext === ".xlsx") await writeFile(outPath, await renderers.xlsx());
   else if (ext === ".md") await writeFile(outPath, renderers.md(), "utf8");
   else if (ext === ".html") await writeFile(outPath, renderers.html(), "utf8");
   else if (ext === ".xml") await writeFile(outPath, renderers.junit(), "utf8");
-  else if (ext === ".sarif") await writeFile(outPath, renderers.sarif(), "utf8");
+  else if (ext === ".sarif")
+    await writeFile(outPath, renderers.sarif(), "utf8");
   else await writeFile(outPath, renderers.json(), "utf8");
 }
 
@@ -574,7 +700,11 @@ export async function writeReport(
   options: { violationsOnly?: boolean } = {},
 ): Promise<void> {
   const rows = toReportRows(document, chains, violations);
-  const summary = buildSummary(rows, [document.project?.name ?? "project"], violations);
+  const summary = buildSummary(
+    rows,
+    [document.project?.name ?? "project"],
+    violations,
+  );
   const displayRows = options.violationsOnly ? filterViolationRows(rows) : rows;
   await writeByExtension(outPath, {
     xlsx: () => toXlsxReport(displayRows, summary),
@@ -593,7 +723,9 @@ export function printConsoleSummary(document: NoticesDocument): void {
     console.log(`\n${group.key} (${group.components.length})`);
     for (const component of group.components) {
       const license = component.licenses[0]?.id ?? "UNKNOWN";
-      console.log(`  ${component.name}@${component.version ?? "?"}  ${license}`);
+      console.log(
+        `  ${component.name}@${component.version ?? "?"}  ${license}`,
+      );
     }
   }
   console.log(`\n${result.total} component(s) total`);

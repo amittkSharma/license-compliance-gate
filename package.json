@@ -1,7 +1,20 @@
 {
-  "name": "license-compliance-gate",
-  "version": "0.1.0",
+  "name": "@amittksharma/license-compliance-gate",
+  "version": "1.0.0",
   "description": "SBOM/license compliance gate for Node projects — scans dependencies with license-checker, normalizes and diffs them with foss-notices-viewer, and enforces a configurable license policy in CI.",
+  "keywords": [
+    "license",
+    "license-compliance",
+    "sbom",
+    "compliance",
+    "gpl",
+    "copyleft",
+    "license-checker",
+    "ci",
+    "policy",
+    "spdx",
+    "cyclonedx"
+  ],
   "type": "module",
   "license": "MIT",
   "author": "Amitt K Sharma",
@@ -34,11 +47,13 @@
   },
   "scripts": {
     "build": "tsup",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
     "test": "node --import tsx --test test/**/*.test.ts",
     "typecheck": "tsc --noEmit",
     "demo": "npm run build && node dist/cli.js scan . --out compliance-report.json --no-fail && cat compliance-report.json",
-    "release:dry": "npm run typecheck && npm test && npm run build && commit-and-tag-version --dry-run",
-    "release": "npm run typecheck && npm test && npm run build && commit-and-tag-version"
+    "release:dry": "npm run lint && npm run typecheck && npm test && npm run build && commit-and-tag-version --dry-run",
+    "release": "npm run lint && npm run typecheck && npm test && npm run build && commit-and-tag-version"
   },
   "dependencies": {
     "commander": "^12.1.0",
@@ -48,11 +63,15 @@
     "read-installed": "^4.0.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.9",
     "@types/license-checker": "^25.0.6",
     "@types/node": "^22.9.0",
     "commit-and-tag-version": "^13.2.1",
     "tsup": "^8.3.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

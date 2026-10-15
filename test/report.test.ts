@@ -1,26 +1,26 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import ExcelJS from "exceljs";
 import type { NoticesDocument } from "foss-notices-viewer";
-import type { PolicyViolation, RepoScanResult } from "../src/types.js";
 import {
-  toReportRows,
   buildSummary,
   buildWorkspaceReport,
   filterViolationRows,
-  toMarkdownReport,
-  toMarkdownWorkspaceReport,
   toHtmlReport,
   toHtmlWorkspaceReport,
   toJsonReport,
   toJsonWorkspaceReport,
-  toXlsxReport,
-  toXlsxWorkspaceReport,
   toJunitReport,
   toJunitWorkspaceReport,
+  toMarkdownReport,
+  toMarkdownWorkspaceReport,
+  toReportRows,
   toSarifReport,
   toSarifWorkspaceReport,
+  toXlsxReport,
+  toXlsxWorkspaceReport,
 } from "../src/report.js";
+import type { PolicyViolation, RepoScanResult } from "../src/types.js";
 
 const document: NoticesDocument = {
   source: "unknown",
@@ -34,10 +34,18 @@ const document: NoticesDocument = {
   ],
 };
 
+const [firstComponent] = document.components;
+if (!firstComponent) throw new Error("fixture document has no components");
+
 const copyleftDocument: NoticesDocument = {
   source: "unknown",
   components: [
-    { name: "gpl-thing", version: "2.0.0", licenses: [{ id: "GPL-3.0", name: "GPL-3.0" }], copyrights: [] },
+    {
+      name: "gpl-thing",
+      version: "2.0.0",
+      licenses: [{ id: "GPL-3.0", name: "GPL-3.0" }],
+      copyrights: [],
+    },
   ],
 };
 
@@ -53,9 +61,15 @@ const copyleftViolation: PolicyViolation = {
 test("toReportRows attaches a dependency chain only for non-permissive rows with a known chain", () => {
   const chains = new Map([["left-pad@1.3.0", ["root", "left-pad"]]]);
   const permissiveRows = toReportRows(document, chains);
-  assert.equal(permissiveRows[0]?.chain, undefined, "MIT is permissive, so no chain is attached");
+  assert.equal(
+    permissiveRows[0]?.chain,
+    undefined,
+    "MIT is permissive, so no chain is attached",
+  );
 
-  const copyleftChains = new Map([["gpl-thing@2.0.0", ["root", "mid", "gpl-thing"]]]);
+  const copyleftChains = new Map([
+    ["gpl-thing@2.0.0", ["root", "mid", "gpl-thing"]],
+  ]);
   const rows = toReportRows(copyleftDocument, copyleftChains);
   assert.equal(rows[0]?.chain, "root > mid > gpl-thing");
 });
@@ -91,24 +105,37 @@ test("buildSummary reports total components, distinct licenses, and gate status"
 
 test("markdown: summary section, then a table", () => {
   const rows = toReportRows(document);
-  const markdown = toMarkdownReport(rows, buildSummary(rows, ["repo-a"], noViolations));
+  const markdown = toMarkdownReport(
+    rows,
+    buildSummary(rows, ["repo-a"], noViolations),
+  );
   assert.match(markdown, /## Summary/);
   assert.match(markdown, /Total components: 1/);
   assert.match(markdown, /Compliance gate: PASSED/);
   assert.match(markdown, /## Components/);
-  const tableLines = markdown.split("## Components\n\n")[1]?.trim().split("\n") ?? [];
+  const tableLines =
+    markdown.split("## Components\n\n")[1]?.trim().split("\n") ?? [];
   assert.equal(tableLines.length, 3);
   assert.match(tableLines[2] ?? "", /left-pad.*1\.3\.0.*MIT/);
 });
 
 test("markdown: escapes pipe characters so they don't break the table grid", () => {
-  const doc = { ...document, components: [{ ...document.components[0]!, name: "weird|name" }] };
+  const doc = {
+    ...document,
+    components: [{ ...firstComponent, name: "weird|name" }],
+  };
   const rows = toReportRows(doc);
-  assert.match(toMarkdownReport(rows, buildSummary(rows, ["repo-a"], noViolations)), /weird\\\|name/);
+  assert.match(
+    toMarkdownReport(rows, buildSummary(rows, ["repo-a"], noViolations)),
+    /weird\\\|name/,
+  );
 });
 
 test("html: renders a summary box, filter dropdowns, and a table with an escaped cell", () => {
-  const doc = { ...document, components: [{ ...document.components[0]!, name: "<script>" }] };
+  const doc = {
+    ...document,
+    components: [{ ...firstComponent, name: "<script>" }],
+  };
   const rows = toReportRows(doc);
   const html = toHtmlReport(rows, buildSummary(rows, ["repo-a"], noViolations));
   assert.match(html, /<table>/);
@@ -122,36 +149,52 @@ test("html: renders a summary box, filter dropdowns, and a table with an escaped
 
 test("html: adds a Violation column, data-violation attribute, and a violations filter only when violations were evaluated", () => {
   const rows = toReportRows(copyleftDocument, undefined, [copyleftViolation]);
-  const html = toHtmlReport(rows, buildSummary(rows, ["repo-a"], [copyleftViolation]));
+  const html = toHtmlReport(
+    rows,
+    buildSummary(rows, ["repo-a"], [copyleftViolation]),
+  );
   assert.match(html, /<th>Violation<\/th>/);
   assert.match(html, /data-violation="Yes"/);
   assert.match(html, /id="violationFilter"/);
 
   const cleanRows = toReportRows(document);
-  const cleanHtml = toHtmlReport(cleanRows, buildSummary(cleanRows, ["repo-a"], noViolations));
+  const cleanHtml = toHtmlReport(
+    cleanRows,
+    buildSummary(cleanRows, ["repo-a"], noViolations),
+  );
   assert.doesNotMatch(cleanHtml, /id="violationFilter"/);
 });
 
 test("markdown: renders a Violation column when rows were evaluated against a policy", () => {
   const rows = toReportRows(copyleftDocument, undefined, [copyleftViolation]);
-  const markdown = toMarkdownReport(rows, buildSummary(rows, ["repo-a"], [copyleftViolation]));
+  const markdown = toMarkdownReport(
+    rows,
+    buildSummary(rows, ["repo-a"], [copyleftViolation]),
+  );
   assert.match(markdown, /\| Violation \|/);
   assert.match(markdown, /gpl-thing.*\| Yes \|/);
 });
 
 test("json: wraps rows in { summary, components }", () => {
   const rows = toReportRows(document);
-  const single = JSON.parse(toJsonReport(rows, buildSummary(rows, ["repo-a"], noViolations)));
+  const single = JSON.parse(
+    toJsonReport(rows, buildSummary(rows, ["repo-a"], noViolations)),
+  );
   assert.equal(single.components[0].name, "left-pad");
   assert.equal(single.summary.totalComponents, 1);
 });
 
 test("xlsx: produces a workbook with Summary and Notices sheets and a header row", async () => {
   const rows = toReportRows(document);
-  const buffer = await toXlsxReport(rows, buildSummary(rows, ["repo-a"], noViolations));
+  const buffer = await toXlsxReport(
+    rows,
+    buildSummary(rows, ["repo-a"], noViolations),
+  );
   const workbook = new ExcelJS.Workbook();
   // exceljs types `load` against its own module-local `Buffer` (extends `ArrayBuffer`), not Node's `Buffer`.
-  await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+  await workbook.xlsx.load(
+    buffer as unknown as Parameters<typeof workbook.xlsx.load>[0],
+  );
 
   const summarySheet = workbook.getWorksheet("Summary");
   assert.ok(summarySheet);
@@ -163,7 +206,11 @@ test("xlsx: produces a workbook with Summary and Notices sheets and a header row
   assert.equal(sheet?.getRow(2).getCell(1).value, "left-pad");
 });
 
-function makeResult(repo: string, document: NoticesDocument, violations: PolicyViolation[]): RepoScanResult {
+function makeResult(
+  repo: string,
+  document: NoticesDocument,
+  violations: PolicyViolation[],
+): RepoScanResult {
   return { repo, document, violations, chains: new Map() };
 }
 
@@ -195,9 +242,21 @@ test("buildWorkspaceReport: violationsOnly filters displayed rows per repo but k
   ];
   const report = buildWorkspaceReport(results, { violationsOnly: true });
 
-  assert.equal(report.overall.totalComponents, 2, "overall summary still reflects every scanned component");
-  assert.equal(report.repos[0]?.rows.length, 0, "repo-a has no violations, so no rows are shown");
-  assert.equal(report.repos[0]?.summary.totalComponents, 1, "per-repo summary is also unfiltered");
+  assert.equal(
+    report.overall.totalComponents,
+    2,
+    "overall summary still reflects every scanned component",
+  );
+  assert.equal(
+    report.repos[0]?.rows.length,
+    0,
+    "repo-a has no violations, so no rows are shown",
+  );
+  assert.equal(
+    report.repos[0]?.summary.totalComponents,
+    1,
+    "per-repo summary is also unfiltered",
+  );
   assert.equal(report.repos[1]?.rows.length, 1);
   assert.equal(report.repos[1]?.rows[0]?.name, "gpl-thing");
 });
@@ -213,7 +272,8 @@ test("markdown workspace report: an overall summary, then one heading + table pe
   assert.match(markdown, /## repo-a/);
   assert.match(markdown, /## repo-b/);
   // repo-a's own section reports its own (passing) gate, not the overall failing one.
-  const repoASection = markdown.split("## repo-a")[1]?.split("## repo-b")[0] ?? "";
+  const repoASection =
+    markdown.split("## repo-a")[1]?.split("## repo-b")[0] ?? "";
   assert.match(repoASection, /Compliance gate: PASSED/);
   assert.match(repoASection, /left-pad/);
 });
@@ -227,8 +287,14 @@ test("html workspace report: a collapsible <details> section per repo, each with
   assert.match(html, /<details class="repo" open>/);
   const detailsCount = html.match(/<details class="repo"/g)?.length ?? 0;
   assert.equal(detailsCount, 2);
-  assert.match(html, /<summary>repo-a <span class="gate pass">PASSED<\/span><\/summary>/);
-  assert.match(html, /<summary>repo-b <span class="gate fail">FAILED<\/span><\/summary>/);
+  assert.match(
+    html,
+    /<summary>repo-a <span class="gate pass">PASSED<\/span><\/summary>/,
+  );
+  assert.match(
+    html,
+    /<summary>repo-b <span class="gate fail">FAILED<\/span><\/summary>/,
+  );
   assert.match(html, /id="riskFilter"/);
 });
 
@@ -253,7 +319,9 @@ test("xlsx workspace report: a Summary sheet with a per-repo rollup, plus one sh
   ]);
   const buffer = await toXlsxWorkspaceReport(report);
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+  await workbook.xlsx.load(
+    buffer as unknown as Parameters<typeof workbook.xlsx.load>[0],
+  );
 
   assert.ok(workbook.getWorksheet("Summary"));
   const repoASheet = workbook.getWorksheet("repo-a");
@@ -270,8 +338,14 @@ test("toJunitReport: a <testcase> per row, <failure> only for violations", () =>
   const xml = toJunitReport(rows, "my-project");
 
   assert.match(xml, /<testsuite name="my-project" tests="1" failures="1">/);
-  assert.match(xml, /<testcase classname="license-compliance-gate" name="gpl-thing@2\.0\.0">/);
-  assert.match(xml, /<failure message="GPL-3\.0 is Copyleft and violates the license policy">/);
+  assert.match(
+    xml,
+    /<testcase classname="license-compliance-gate" name="gpl-thing@2\.0\.0">/,
+  );
+  assert.match(
+    xml,
+    /<failure message="GPL-3\.0 is Copyleft and violates the license policy">/,
+  );
 });
 
 test("toJunitReport: a clean row gets a self-closing <testcase>, no <failure>", () => {
@@ -279,7 +353,10 @@ test("toJunitReport: a clean row gets a self-closing <testcase>, no <failure>", 
   const xml = toJunitReport(rows);
 
   assert.match(xml, /tests="1" failures="0"/);
-  assert.match(xml, /<testcase classname="license-compliance-gate" name="left-pad@1\.3\.0" \/>/);
+  assert.match(
+    xml,
+    /<testcase classname="license-compliance-gate" name="left-pad@1\.3\.0" \/>/,
+  );
   assert.doesNotMatch(xml, /<failure/);
 });
 
@@ -297,31 +374,55 @@ test("toJunitWorkspaceReport: one <testsuite> per repo inside <testsuites>", () 
 
 test("toSarifReport: only violations become results, each pointing at package.json", () => {
   const sarif = JSON.parse(toSarifReport([copyleftViolation])) as {
-    runs: [{ tool: { driver: { rules: { id: string }[] } }; results: { ruleId: string; locations: unknown[] }[] }];
+    runs: [
+      {
+        tool: { driver: { rules: { id: string }[] } };
+        results: { ruleId: string; locations: unknown[] }[];
+      },
+    ];
   };
 
   const run = sarif.runs[0];
   assert.equal(run.results.length, 1);
   assert.equal(run.results[0]?.ruleId, "disallowed-risk-tier/GPL-3.0");
-  assert.deepEqual(run.tool.driver.rules.map((r) => r.id), ["disallowed-risk-tier/GPL-3.0"]);
-  assert.equal(
-    (run.results[0]?.locations[0] as { physicalLocation: { artifactLocation: { uri: string } } }).physicalLocation
-      .artifactLocation.uri,
-    "package.json",
+  assert.deepEqual(
+    run.tool.driver.rules.map((r) => r.id),
+    ["disallowed-risk-tier/GPL-3.0"],
   );
+  const location = run.results[0]?.locations[0] as
+    | { physicalLocation: { artifactLocation: { uri: string } } }
+    | undefined;
+  assert.equal(location?.physicalLocation.artifactLocation.uri, "package.json");
 });
 
 test("toSarifReport: a clean scan produces an empty results array, not an error", () => {
-  const sarif = JSON.parse(toSarifReport([])) as { runs: [{ results: unknown[] }] };
+  const sarif = JSON.parse(toSarifReport([])) as {
+    runs: [{ results: unknown[] }];
+  };
   assert.deepEqual(sarif.runs[0]?.results, []);
 });
 
 test("toSarifWorkspaceReport: prefixes each finding's location with its own repo name", () => {
-  const results = [makeResult("repo-a", document, noViolations), makeResult("repo-b", copyleftDocument, [copyleftViolation])];
+  const results = [
+    makeResult("repo-a", document, noViolations),
+    makeResult("repo-b", copyleftDocument, [copyleftViolation]),
+  ];
   const sarif = JSON.parse(toSarifWorkspaceReport(results)) as {
-    runs: [{ results: { locations: { physicalLocation: { artifactLocation: { uri: string } } }[] }[] }];
+    runs: [
+      {
+        results: {
+          locations: {
+            physicalLocation: { artifactLocation: { uri: string } };
+          }[];
+        }[];
+      },
+    ];
   };
 
   assert.equal(sarif.runs[0]?.results.length, 1);
-  assert.equal(sarif.runs[0]?.results[0]?.locations[0]?.physicalLocation.artifactLocation.uri, "repo-b/package.json");
+  assert.equal(
+    sarif.runs[0]?.results[0]?.locations[0]?.physicalLocation.artifactLocation
+      .uri,
+    "repo-b/package.json",
+  );
 });

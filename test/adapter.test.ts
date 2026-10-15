@@ -1,5 +1,5 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { parseLicenseCheckerOutput } from "../src/adapters/licenseChecker.js";
 
 test("maps a direct dependency to a direct component", () => {
@@ -51,6 +51,9 @@ test("joins an array of licenses with OR", () => {
 });
 
 test("falls back to UNKNOWN when license-checker found no license", () => {
-  const document = parseLicenseCheckerOutput({ "mystery@0.0.1": {} }, new Set());
+  const document = parseLicenseCheckerOutput(
+    { "mystery@0.0.1": {} },
+    new Set(),
+  );
   assert.equal(document.components[0]?.licenses[0]?.id, "UNKNOWN");
 });
